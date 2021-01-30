@@ -112,6 +112,12 @@ func newFuncDialOption(f func(*dialOptions)) *funcDialOption {
 //
 // Zero will disable the write buffer such that each write will be on underlying
 // connection. Note: A Send call may not directly translate to a write.
+//
+// WithWriteBufferSize这是写缓存区大小的。实际分配的内存是设置值的2倍。默认是32KB
+// 0 表示不使用写缓存区。
+// 为什么2倍的缓存区可以减少系统调用？
+//	回答：因为每次调用Framer.endWrite() -> bufWriter.Write()写入数据的时候，数据有可能是 n * 32kb + b 个字节，
+//		如果数据不是32kb的整数倍，即b > 0，会多1次调用 conn.Write()
 func WithWriteBufferSize(s int) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.WriteBufferSize = s
@@ -123,6 +129,10 @@ func WithWriteBufferSize(s int) DialOption {
 //
 // The default value for this buffer is 32KB. Zero will disable read buffer for
 // a connection so data framer can access the underlying conn directly.
+//
+// WithReadBufferSize是让你设置读缓存区的，决定着一次系统调用read能读取多少数据
+// 默认值32KB. 0 表示不是读缓存区，所以framer的数据可以直接从底层conn读取出来
+// 注：WithReadBufferSize > 0 时，底层使用了bufio缓存读
 func WithReadBufferSize(s int) DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.copts.ReadBufferSize = s
@@ -284,6 +294,7 @@ func withBackoff(bs internalbackoff.Strategy) DialOption {
 // WithBlock returns a DialOption which makes caller of Dial blocks until the
 // underlying connection is up. Without this, Dial returns immediately and
 // connecting the server happens in background.
+// 建立连接的时候是阻塞着等待连接建立完成，还是立即返回让连接在背后建立完成
 func WithBlock() DialOption {
 	return newFuncDialOption(func(o *dialOptions) {
 		o.block = true
